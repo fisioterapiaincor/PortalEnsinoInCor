@@ -29,7 +29,7 @@ if "%MODO%"=="3" (
 if "%MODO%"=="1" (
     set "PS_EXTRA=-DryRun"
     echo.
-    echo  ^>^> Modo SIMULACAO selecionado. Nenhum arquivo sera movido. ^<^
+    echo  [SIMULACAO] Nenhum arquivo sera movido.
     echo.
 ) else if "%MODO%"=="2" (
     set "PS_EXTRA="
@@ -117,16 +117,21 @@ goto :FIM
 
 :SUGERIR_RAIZ
 set "ARQ_ESTRUTURA=%~1"
+set "RAIZ_MULTIPLA=0"
 for /f "usebackq delims=" %%L in (`findstr /R /C:"^[A-Za-z]:\\.*" "%ARQ_ESTRUTURA%"`) do (
-    set "RAIZ_SUGERIDA=%%L"
-    goto :EOF
+    if not defined RAIZ_SUGERIDA (
+        set "RAIZ_SUGERIDA=%%L"
+    ) else (
+        set "RAIZ_MULTIPLA=1"
+    )
 )
+if "%RAIZ_MULTIPLA%"=="1" echo  [AVISO] estrutura_ensino.txt tem mais de um caminho absoluto; usando o primeiro.
 goto :EOF
 
 :EXTRAIR_PS
 setlocal DisableDelayedExpansion
 set "PS_DEST=%~1"
-break > "%PS_DEST%" || (endlocal & exit /b 1)
+type nul > "%PS_DEST%" || (endlocal & exit /b 1)
 set "COPIAR_PS="
 for /f "usebackq delims=" %%L in ("%~f0") do (
     if defined COPIAR_PS >> "%PS_DEST%" echo(%%L
@@ -136,11 +141,13 @@ endlocal & exit /b 0
 
 :FIM_ERRO
 echo.
+endlocal
 pause
 exit /b 1
 
 :FIM
 echo.
+endlocal
 pause
 exit /b 0
 
