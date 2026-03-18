@@ -1,28 +1,19 @@
         // ====================================================================
         // APPS SCRIPT DATA FETCHING
         // ====================================================================
-        // Firebase Authentication + Apps Script data loading
-        let fbApp = null;
-        let fbAuth = null;
-        let fbGoogleProvider = null;
+        // Supabase Authentication + Apps Script data loading
+        let sbClient = null;
         
-        function initializeFirebase() {
-            if (fbApp) {
-                console.log('[initializeFirebase] Firebase já inicializado, reutilizando instância existente');
+        function initializeSupabase() {
+            if (sbClient) {
+                console.log('[initializeSupabase] Supabase já inicializado, reutilizando instância existente');
                 return;
             }
-            if (!window.firebase) {
-                throw new Error('Firebase não carregado. Verifique firebase-config.js.');
+            if (!window.supabaseClient) {
+                throw new Error('Supabase não carregado. Verifique supabase-config.js e a importação CDN em index.html.');
             }
-            const cfg = window.firebase.firebaseConfig;
-            if (!cfg?.apiKey || cfg.apiKey.startsWith('SUA_') || cfg.apiKey === 'YOUR_API_KEY') {
-                throw new Error('Firebase config inválida: apiKey ausente ou placeholder. Configure firebase-config.js com os dados do Firebase Console.');
-            }
-            console.log('[initializeFirebase] Config carregada — projectId:', cfg.projectId, '| authDomain:', cfg.authDomain);
-            fbApp = window.firebase.initializeApp(cfg);
-            fbAuth = window.firebase.getAuth(fbApp);
-            fbGoogleProvider = new window.firebase.GoogleAuthProvider();
-            console.log('[initializeFirebase] Firebase App e Auth inicializados; provider Google criado (método preferido: popup → redirect)');
+            sbClient = window.supabaseClient;
+            console.log('[initializeSupabase] Supabase Auth inicializado');
         }
         
         /**
@@ -3340,10 +3331,6 @@ function extractTimeFromISO(isoString) {
             console.log('[setupEventHandlers] Configurando listeners...');
             // Login form event listener - registered only once to prevent duplicate submissions
             document.getElementById('login-form').addEventListener('submit', handleLogin);
-            const googleLoginButton = document.getElementById('login-google-button');
-            if (googleLoginButton) {
-                googleLoginButton.addEventListener('click', handleGoogleLogin);
-            }
             setupHeaderNavigation();
             
             // Sidebar toggle - only if element exists (legacy support)
@@ -3805,7 +3792,7 @@ function extractTimeFromISO(isoString) {
 
         async function handleLogin(event) {
             event.preventDefault();
-            console.log("[handleLogin] Login initiated - Firebase Auth");
+            console.log("[handleLogin] Login initiated - Supabase Auth");
 
             const loginButton = document.getElementById("login-button");
             const errorBox = document.getElementById("login-error");
@@ -3820,62 +3807,25 @@ function extractTimeFromISO(isoString) {
             errorBox.style.display = "none";
 
             try {
-                await window.firebase.signInWithEmailAndPassword(fbAuth, email, password);
-                console.log("[handleLogin] Login Firebase realizado com sucesso");
-            } catch (error) {
-                const authErrorMap = {
-                    'auth/invalid-credential': 'Email ou senha inválidos.',
-                    'auth/user-not-found': 'Usuário não encontrado.',
-                    'auth/wrong-password': 'Senha incorreta.',
-                    'auth/invalid-email': 'Email inválido.',
-                    'auth/too-many-requests': 'Muitas tentativas. Tente novamente em alguns minutos.'
-                };
-                showError(authErrorMap[error.code] || 'Erro ao fazer login. Tente novamente.', true);
-                console.error('[handleLogin] Erro no login Firebase:', error);
+                const { error } = await sbClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                    const msgMap = {
+                        'Invalid login credentials': 'Email ou senha inválidos.',
+                        'Email not confirmed': 'Email ainda não confirmado. Verifique sua caixa de entrada.',
+                        'Too many requests': 'Muitas tentativas. Tente novamente em alguns minutos.'
+                    };
+                    const friendly = msgMap[error.message] || error.message || 'Erro ao fazer login. Tente novamente.';
+                    showError(friendly, true);
+                    console.error('[handleLogin] Erro no login Supabase:', error);
+                } else {
+                    console.log("[handleLogin] Login Supabase realizado com sucesso");
+                }
+            } catch (err) {
+                showError('Erro ao fazer login. Tente novamente.', true);
+                console.error('[handleLogin] Exceção no login Supabase:', err);
             } finally {
                 loginButton.classList.remove('loading');
                 loginButton.disabled = false;
-            }
-        }
-
-        async function handleGoogleLogin() {
-            console.log("[handleGoogleLogin] Google login initiated");
-            const googleLoginButton = document.getElementById("login-google-button");
-            const loginButton = document.getElementById("login-button");
-            const errorBox = document.getElementById("login-error");
-
-            if (!googleLoginButton) return;
-
-            googleLoginButton.classList.add('loading');
-            googleLoginButton.disabled = true;
-            if (loginButton) loginButton.disabled = true;
-            if (errorBox) errorBox.style.display = "none";
-
-            try {
-                await window.firebase.signInWithPopup(fbAuth, fbGoogleProvider);
-                console.log("[handleGoogleLogin] Login Google realizado com sucesso");
-            } catch (error) {
-                if (error.code === 'auth/popup-blocked') {
-                    console.warn('[handleGoogleLogin] Popup bloqueado; tentando fluxo de redirect');
-                    await window.firebase.signInWithRedirect(fbAuth, fbGoogleProvider);
-                    return;
-                }
-                const authErrorMap = {
-                    'auth/popup-closed-by-user': 'Login com Google cancelado.',
-                    'auth/unauthorized-domain': 'Domínio não autorizado no Firebase. Adicione este domínio em Authentication → Settings → Authorized domains no Firebase Console.',
-                    'auth/account-exists-with-different-credential': 'Esta conta já existe com outro método de login.',
-                    'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'API Key do Firebase inválida. Copie a configuração correta do Firebase Console e atualize firebase-config.js.',
-                    'auth/invalid-api-key': 'API Key do Firebase inválida. Copie a configuração correta do Firebase Console e atualize firebase-config.js.',
-                    'auth/app-not-authorized': 'Aplicação não autorizada. Verifique as Authorized domains e o provedor Google em Firebase Console → Authentication.',
-                    'auth/configuration-not-found': 'Configuração do Firebase não encontrada. Verifique se o projectId e apiKey em firebase-config.js estão corretos.',
-                    'auth/operation-not-allowed': 'Login com Google não está habilitado. Ative o provedor Google em Firebase Console → Authentication → Sign-in method.'
-                };
-                showError(authErrorMap[error.code] || `Erro ao fazer login com Google (${error.code || 'desconhecido'}). Verifique firebase-config.js.`, true);
-                console.error('[handleGoogleLogin] Erro no login Google:', error);
-            } finally {
-                googleLoginButton.classList.remove('loading');
-                googleLoginButton.disabled = false;
-                if (loginButton) loginButton.disabled = false;
             }
         }
 
@@ -3889,11 +3839,11 @@ function extractTimeFromISO(isoString) {
             }
             
             try {
-                if (fbAuth && window.firebase?.signOut) {
-                    await window.firebase.signOut(fbAuth);
+                if (sbClient) {
+                    await sbClient.auth.signOut();
                 }
             } catch (error) {
-                console.error('[handleLogout] Erro ao fazer logout no Firebase:', error);
+                console.error('[handleLogout] Erro ao fazer logout no Supabase:', error);
             }
 
             // Clear saved navigation state on logout
@@ -3937,11 +3887,6 @@ function extractTimeFromISO(isoString) {
             if (loginButton) {
                 loginButton.classList.remove('loading');
                 loginButton.disabled = false;
-            }
-            const googleLoginButton = document.getElementById('login-google-button');
-            if (googleLoginButton) {
-                googleLoginButton.classList.remove('loading');
-                googleLoginButton.disabled = false;
             }
             
             // Clean up: hide login error messages
@@ -3987,7 +3932,7 @@ function extractTimeFromISO(isoString) {
         function updateUserMenuInfo(user) {
             if (!user) return;
             
-            const userName = user.displayName || user.email.split('@')[0];
+            const userName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '';
             const userEmail = user.email;
             
             // Update dashboard topbar user info
@@ -11990,15 +11935,11 @@ function renderTabEscala(escalas) {
 
         // --- Inicia ---
         document.addEventListener('DOMContentLoaded', async () => {
-            console.log("DOM Carregado. Inicializando autenticação Firebase.");
+            console.log("DOM Carregado. Inicializando autenticação Supabase.");
 
             const loginButton = document.getElementById('login-button');
             if (loginButton) {
                 loginButton.disabled = true;
-            }
-            const googleLoginButton = document.getElementById('login-google-button');
-            if (googleLoginButton) {
-                googleLoginButton.disabled = true;
             }
             
             // Update footer years dynamically
@@ -12011,35 +11952,20 @@ function renderTabEscala(escalas) {
             setupEventHandlers();
             
             try {
-                initializeFirebase();
-                try {
-                    await window.firebase.getRedirectResult(fbAuth);
-                } catch (redirectError) {
-                    const redirectErrMap = {
-                        'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'API Key do Firebase inválida. Atualize firebase-config.js com a configuração correta do Firebase Console.',
-                        'auth/invalid-api-key': 'API Key do Firebase inválida. Atualize firebase-config.js com a configuração correta do Firebase Console.',
-                        'auth/unauthorized-domain': 'Domínio não autorizado. Adicione este domínio em Firebase Console → Authentication → Authorized domains.',
-                        'auth/operation-not-allowed': 'Login com Google não está habilitado. Ative o provedor Google em Firebase Console → Authentication → Sign-in method.'
-                    };
-                    const msg = redirectErrMap[redirectError.code] || `Erro ao concluir login com Google (${redirectError.code || 'desconhecido'}). Tente novamente.`;
-                    console.error('[Init] Erro ao concluir redirect do Google login:', redirectError);
-                    showError(msg, true);
-                }
+                initializeSupabase();
                 
                 if (loginButton) {
                     loginButton.disabled = false;
                 }
-                if (googleLoginButton) {
-                    googleLoginButton.disabled = false;
-                }
 
-                window.firebase.onAuthStateChanged(fbAuth, async (user) => {
+                const { data: { subscription } } = sbClient.auth.onAuthStateChange(async (event, session) => {
+                    const user = session?.user ?? null;
                     if (user) {
                         updateUserMenuInfo(user);
                         // Show turma selection before loading dashboard data
                         const userLabel = document.getElementById('turma-select-user');
                         if (userLabel) {
-                            userLabel.textContent = user.displayName || user.email || '';
+                            userLabel.textContent = user.user_metadata?.full_name || user.user_metadata?.name || user.email || '';
                         }
                         renderTurmaCards();
                         showView('turma-select-view');
@@ -12048,8 +11974,8 @@ function renderTabEscala(escalas) {
                     }
                 });
             } catch (error) {
-                console.error('[Init] Erro ao inicializar Firebase:', error);
-                showError('Falha ao inicializar autenticação Firebase. Verifique firebase-config.js.', true);
+                console.error('[Init] Erro ao inicializar Supabase:', error);
+                showError('Falha ao inicializar autenticação Supabase. Verifique supabase-config.js.', true);
                 showView('login-view');
             }
 

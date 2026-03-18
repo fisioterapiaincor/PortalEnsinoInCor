@@ -10,33 +10,49 @@ O site está **completamente configurado** para ler dados do Google Sheets atrav
 
 ---
 
-## 🚀 Como Usar
+## 🔐 Autenticação — Supabase
 
-### Comandos NPM para Firebase CLI
+A autenticação é feita via **Supabase Auth** (email/senha).  
+Firebase foi removido do projeto.
 
-```bash
-npm run firebase:install
-npm run firebase:login
-npm run firebase:init
-npm run firebase:deploy
+### Configurar credenciais do Supabase
+
+1. Acesse [supabase.com](https://supabase.com) e abra seu projeto.
+2. Vá em **Project Settings → API**.
+3. Copie:
+   - **Project URL** → cole em `SUPABASE_URL`
+   - **anon / public key** → cole em `SUPABASE_ANON_KEY`
+4. Abra o arquivo `supabase-config.js` e substitua os placeholders:
+
+```js
+export const SUPABASE_URL = "https://<seu-ref>.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJ...";
 ```
 
-### Início Rápido (2 minutos)
+> ⚠️ **Nunca** coloque a chave `service_role` (sb_secret_*) neste arquivo — ela é somente para back-end.
 
-1. **Configure a URL do Apps Script** (se ainda não configurou)
-   - Abra: `firebase-config.js`
-   - A URL já está configurada: https://script.google.com/macros/s/AKfycbx6x-I0PCc1Ym8vx7VYyXmwvx3mY-9i3P16z6-5sJB2v728SlzENKnwy-4uAIHIiDLxGg/exec
+### Criar usuários
 
-2. **Configure usuários no Firebase** (apenas para login)
-   - Acesse: https://console.firebase.google.com/
-   - Projeto: dashboardalunos
-   - Authentication → Users → Add user
+No painel do Supabase:  
+**Authentication → Users → Invite user** (ou **Add user**) → insira o e-mail e senha desejados.
 
-3. **Acesse o site**
-   ```
-   Abra: index.html
-   Faça login com as credenciais do Firebase
-   ```
+---
+
+## 🚀 Como Usar
+
+### Início Rápido
+
+1. **Configure o Supabase** (veja seção acima)
+2. **Abra o site localmente** com qualquer servidor HTTP:
+
+```bash
+# Python 3
+python3 -m http.server 8080
+# ou
+npm start
+```
+
+3. Acesse `http://localhost:8080` e faça login com as credenciais criadas no Supabase.
 
 ---
 
@@ -49,10 +65,10 @@ Google Sheets (Apps Script)
     ↓
 Website (fetch a cada 5 minutos) ⚡
     ↓
-Firebase Auth (apenas login) 🔒
+Supabase Auth (apenas login) 🔒
 ```
 
-**Nota:** Firebase é usado APENAS para autenticação (login). Todos os dados vêm do Google Apps Script.
+**Nota:** Supabase é usado APENAS para autenticação (login). Todos os dados vêm do Google Apps Script.
 
 ---
 
