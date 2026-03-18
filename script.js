@@ -1903,6 +1903,81 @@ function extractTimeFromISO(isoString) {
         // TURMA SELECTION
         // ====================================================================
 
+        /**
+         * Render turma selection cards dynamically from turmas-config.json data.
+         * Active turmas (with URL) show as clickable cards.
+         * The next upcoming turma (first without URL after the last active one) shows as
+         * a disabled "Em breve" card so users know future years are planned.
+         * Call this whenever the turma-select-view becomes visible.
+         */
+        function renderTurmaCards() {
+            const grid = document.getElementById('turma-cards-grid');
+            if (!grid) return;
+
+            const cfg = window.appsScriptConfig || {};
+            const list = cfg.turmasList || [];
+            const urls = cfg.turmaURLs || {};
+
+            // Fallback: build a minimal list from turmaURLs if turmasList is empty
+            let turmas = list.length > 0 ? list : Object.keys(urls).sort().map(ano => ({ ano, url: urls[ano] }));
+
+            if (turmas.length === 0) {
+                grid.innerHTML = '<p class="turma-cards-empty">Nenhuma turma configurada.</p>';
+                return;
+            }
+
+            // Find the highest-year active turma (to mark as "Novo")
+            const activeAno = turmas.filter(t => t.url).map(t => t.ano).sort((a, b) => Number(a) - Number(b)).pop();
+            // Find the first upcoming turma (no URL, year > highest active year)
+            const firstUpcoming = turmas.find(t => !t.url && Number(t.ano) > Number(activeAno || 0));
+
+            const arrowSVG = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>`;
+            const lockSVG = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>`;
+
+            const fragments = [];
+
+            turmas.forEach(t => {
+                const isActive = !!t.url;
+                const isNewest = isActive && t.ano === activeAno;
+                const isUpcoming = !isActive && t.ano === firstUpcoming?.ano;
+
+                // Only render active cards and the first upcoming card
+                if (!isActive && !isUpcoming) return;
+
+                if (isActive) {
+                    const classes = ['turma-card', isNewest ? 'turma-card--new' : ''].filter(Boolean).join(' ');
+                    fragments.push(
+                        `<button class="${classes}" id="turma-card-${t.ano}" aria-label="Selecionar Turma ${t.ano}">` +
+                        (isNewest ? `<span class="turma-card-badge">Novo</span>` : '') +
+                        `<div class="turma-card-year">${t.ano}</div>` +
+                        `<div class="turma-card-desc">Dados e registros da turma de ${t.ano}</div>` +
+                        `<div class="turma-card-arrow">${arrowSVG}</div>` +
+                        `</button>`
+                    );
+                } else {
+                    // Upcoming / disabled card
+                    fragments.push(
+                        `<div class="turma-card turma-card--disabled" aria-label="Turma ${t.ano} - Em breve" aria-disabled="true">` +
+                        `<span class="turma-card-badge turma-card-badge--soon">Em breve</span>` +
+                        `<div class="turma-card-year">${t.ano}</div>` +
+                        `<div class="turma-card-desc">Ainda não disponível</div>` +
+                        `<div class="turma-card-arrow turma-card-arrow--disabled">${lockSVG}</div>` +
+                        `</div>`
+                    );
+                }
+            });
+
+            grid.innerHTML = fragments.join('');
+
+            // Attach click listeners to active cards
+            turmas.filter(t => t.url).forEach(t => {
+                const btn = document.getElementById(`turma-card-${t.ano}`);
+                if (btn) {
+                    btn.addEventListener('click', () => window.selectTurma(t.ano));
+                }
+            });
+        }
+
         window.selectTurma = async function(turma) {
             console.log(`[selectTurma] Turma selecionada: ${turma}`);
             const urls = window.appsScriptConfig?.turmaURLs || {};
@@ -3424,15 +3499,8 @@ function extractTimeFromISO(isoString) {
             setupAusenciaFormHandler();
             setupReposicaoFormHandler();
 
-            // Turma select cards
-            const turmaCard2025 = document.getElementById('turma-card-2025');
-            if (turmaCard2025) {
-                turmaCard2025.addEventListener('click', () => window.selectTurma('2025'));
-            }
-            const turmaCard2026 = document.getElementById('turma-card-2026');
-            if (turmaCard2026) {
-                turmaCard2026.addEventListener('click', () => window.selectTurma('2026'));
-            }
+            // Turma select cards are rendered dynamically (see renderTurmaCards())
+            // Listeners are attached inside renderTurmaCards() each time it runs.
 
             // Turma select logout button
             const turmaLogoutBtn = document.getElementById('turma-select-logout-btn');
@@ -3443,7 +3511,10 @@ function extractTimeFromISO(isoString) {
             // Back to turma selection button
             const btnBackTurma = document.getElementById('btn-back-turma');
             if (btnBackTurma) {
-                btnBackTurma.addEventListener('click', () => showView('turma-select-view'));
+                btnBackTurma.addEventListener('click', () => {
+                    renderTurmaCards();
+                    showView('turma-select-view');
+                });
             }
 
             console.log('[setupEventHandlers] Listeners configurados.');
@@ -11970,6 +12041,7 @@ function renderTabEscala(escalas) {
                         if (userLabel) {
                             userLabel.textContent = user.displayName || user.email || '';
                         }
+                        renderTurmaCards();
                         showView('turma-select-view');
                     } else {
                         showView('login-view');
