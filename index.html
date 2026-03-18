@@ -124,27 +124,9 @@
                 <p id="turma-select-user" class="turma-select-user"></p>
             </div>
 
-            <div class="turma-cards-grid">
-                <button class="turma-card" id="turma-card-2025" aria-label="Selecionar Turma 2025">
-                    <div class="turma-card-year">2025</div>
-                    <div class="turma-card-desc">Dados e registros da turma de 2025</div>
-                    <div class="turma-card-arrow">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                        </svg>
-                    </div>
-                </button>
-
-                <button class="turma-card turma-card--new" id="turma-card-2026" aria-label="Selecionar Turma 2026">
-                    <span class="turma-card-badge">Novo</span>
-                    <div class="turma-card-year">2026</div>
-                    <div class="turma-card-desc">Dados e registros da turma de 2026</div>
-                    <div class="turma-card-arrow">
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                        </svg>
-                    </div>
-                </button>
+            <!-- Turma cards are rendered dynamically from turmas-config.json -->
+            <div id="turma-cards-grid" class="turma-cards-grid">
+                <div class="turma-cards-loading">Carregando turmas&hellip;</div>
             </div>
 
             <div class="turma-select-footer">
@@ -1676,12 +1658,36 @@
         const firebase = firebaseModule.default || firebaseModule;
         const appsScriptConfig = firebase.appsScriptConfig;
 
+        // Load turmas configuration from turmas-config.json (single source of truth)
+        // To add a new turma year, edit turmas-config.json – no code changes needed.
+        try {
+            const turmasResp = await fetch('./turmas-config.json');
+            if (turmasResp.ok) {
+                const turmasConfig = await turmasResp.json();
+                if (Array.isArray(turmasConfig.turmas)) {
+                    const turmaURLs = {};
+                    turmasConfig.turmas.forEach(t => {
+                        if (t.url) {
+                            turmaURLs[t.ano] = t.url;
+                        }
+                    });
+                    appsScriptConfig.turmaURLs = turmaURLs;
+                    appsScriptConfig.turmasList = turmasConfig.turmas;
+                    console.log('[Turmas Config] Carregado com sucesso:', Object.keys(turmaURLs).length, 'turma(s) configurada(s)');
+                }
+            } else {
+                console.warn('[Turmas Config] Não foi possível carregar turmas-config.json (status ' + turmasResp.status + ')');
+            }
+        } catch (e) {
+            console.warn('[Turmas Config] Falha ao carregar turmas-config.json, usando configuração padrão:', e.message);
+        }
+
         // Make configuration globally available
         window.firebase = firebase;
         window.appsScriptConfig = appsScriptConfig;
-        
-        console.log('[Firebase Config] Loaded successfully');
-        console.log('[Apps Script Config] Data URL configured:', appsScriptConfig.dataURL);
+
+        console.log('[Firebase Config] Carregado com sucesso');
+        console.log('[Apps Script Config] URL configurada:', appsScriptConfig.dataURL);
     </script>
     <script type="module" src="script.js"></script>
 </body>
