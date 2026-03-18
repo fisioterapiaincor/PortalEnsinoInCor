@@ -1,12 +1,6 @@
 {
   "type": "module",
   "scripts": {
-    "firebase:install": "npm install --save-dev firebase-tools",
-    "firebase:login": "npx firebase-tools login",
-    "firebase:init": "npx firebase-tools init",
-    "firebase:deploy": "npx firebase-tools deploy"
-  },
-  "dependencies": {
-    "firebase": "^12.5.0"
+    "start": "python3 -m http.server 8080 || python -m SimpleHTTPServer 8080"
   }
 }
